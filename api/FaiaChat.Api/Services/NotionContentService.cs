@@ -6,7 +6,7 @@ namespace FaiaChat.Api.Services;
 
 public class NotionContentService
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly NotionConfig _config;
 
     private string? _cachedContent;
@@ -14,14 +14,10 @@ public class NotionContentService
     private DateTime _cacheExpiry = DateTime.MinValue;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    public NotionContentService(IOptions<NotionConfig> config, HttpClient httpClient)
+    public NotionContentService(IOptions<NotionConfig> config, IHttpClientFactory httpClientFactory)
     {
         _config = config.Value;
-        _httpClient = httpClient;
-
-        _httpClient.BaseAddress = new Uri("https://api.notion.com/");
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiKey}");
-        _httpClient.DefaultRequestHeaders.Add("Notion-Version", "2022-06-28");
+        _httpClientFactory = httpClientFactory;
     }
 
     public async Task<string> GetContentAsync()
@@ -79,7 +75,12 @@ public class NotionContentService
 
     private async Task<string> FetchPageContentAsync(string pageId)
     {
-        var response = await _httpClient.GetAsync($"v1/blocks/{pageId}/children?page_size=100");
+        var client = _httpClientFactory.CreateClient("notion");
+        client.BaseAddress = new Uri("https://api.notion.com/");
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiKey}");
+        client.DefaultRequestHeaders.Add("Notion-Version", "2022-06-28");
+
+        var response = await client.GetAsync($"v1/blocks/{pageId}/children?page_size=100");
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync();
