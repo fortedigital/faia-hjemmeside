@@ -55,12 +55,18 @@ function Chat() {
 
     const botId = nextIdRef.current++
 
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000)
+
     try {
       const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: apiMessages }),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeout)
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
@@ -105,6 +111,14 @@ function Chat() {
     }
   }
 
+  const handleRetry = (errorMsgId) => {
+    setMessages((prev) => prev.filter((m) => m.id !== errorMsgId))
+    const lastUserMsg = messages.filter((m) => m.sender === 'user').pop()
+    if (lastUserMsg) {
+      setInputValue(lastUserMsg.text)
+    }
+  }
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleSend()
   }
@@ -116,9 +130,14 @@ function Chat() {
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`${styles.message} ${styles[msg.sender]}`}
+            className={`${styles.message} ${styles[msg.sender]} ${msg.isError ? styles.error : ''}`}
           >
             {msg.text}
+            {msg.isError && (
+              <button className={styles.retryButton} onClick={() => handleRetry(msg.id)}>
+                Prøv igjen
+              </button>
+            )}
           </div>
         ))}
         {isTyping && (
