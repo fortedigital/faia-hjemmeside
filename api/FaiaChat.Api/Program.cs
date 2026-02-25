@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<NotionConfig>(builder.Configuration.GetSection("Notion"));
 builder.Services.AddHttpClient("notion");
 builder.Services.AddSingleton<NotionContentService>();
+builder.Services.AddSingleton<SystemPromptBuilder>();
 
 builder.Services.AddCors(options =>
 {
