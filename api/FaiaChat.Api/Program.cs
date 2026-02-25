@@ -2,6 +2,8 @@ using Anthropic.SDK;
 using Anthropic.SDK.Messaging;
 using FaiaChat.Api.Models;
 using FaiaChat.Api.Services;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,8 +30,20 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("chat", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = 429;
+});
+
 var app = builder.Build();
 app.UseCors();
+app.UseRateLimiter();
 
 app.MapGet("/health", () => "OK");
 
@@ -93,6 +107,6 @@ app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptB
     await context.Response.Body.FlushAsync();
 
     return Results.Empty;
-});
+}).RequireRateLimiting("chat");
 
 app.Run();
