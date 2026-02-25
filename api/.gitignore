@@ -1,0 +1,23 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docuser
+
+## NuGet
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Visual Studio / Rider
+.vs/
+.idea/
+*.swp
+*.*~
+*.DotSettings.user
+
+## User secrets / environment config
+appsettings.Development.json
