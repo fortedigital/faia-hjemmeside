@@ -99,6 +99,18 @@
   }
 }
 
+.limitMessage {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: $color-black;
+  text-align: center;
+
+  a {
+    color: $color-primary;
+    text-decoration: underline;
+  }
+}
+
 .sendButton {
   background: $color-primary;
   color: $color-white;

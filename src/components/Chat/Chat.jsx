@@ -3,6 +3,7 @@ import { welcomeMessage } from '../../data/chatResponses'
 import styles from './Chat.module.scss'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const MAX_USER_MESSAGES = 20
 
 function Chat() {
   const [messages, setMessages] = useState(() => {
@@ -22,6 +23,9 @@ function Chat() {
   const nextIdRef = useRef(
     messages.reduce((max, m) => Math.max(max, m.id), 0) + 1
   )
+
+  const userMessageCount = messages.filter((m) => m.sender === 'user').length
+  const limitReached = userMessageCount >= MAX_USER_MESSAGES
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -127,22 +131,31 @@ function Chat() {
         <div ref={messagesEndRef} />
       </div>
       <div className={styles.inputArea}>
-        <input
-          type="text"
-          className={styles.input}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Fortell oss om din utfordring..."
-          maxLength={500}
-        />
-        <button
-          className={styles.sendButton}
-          onClick={handleSend}
-          disabled={!inputValue.trim() || isTyping}
-        >
-          Send
-        </button>
+        {limitReached ? (
+          <div className={styles.limitMessage}>
+            Du har nådd maks antall meldinger. Ta kontakt med oss for å gå videre:{' '}
+            <a href="mailto:kontakt@faia.no">kontakt@faia.no</a>
+          </div>
+        ) : (
+          <>
+            <input
+              type="text"
+              className={styles.input}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Fortell oss om din utfordring..."
+              maxLength={500}
+            />
+            <button
+              className={styles.sendButton}
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isTyping}
+            >
+              Send
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
