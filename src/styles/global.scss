@@ -1,0 +1,24 @@
+@use 'variables' as *;
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: $font-size-base;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: $font-family;
+  color: $color-black;
+  background: $color-bg;
+  line-height: 1.6;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
