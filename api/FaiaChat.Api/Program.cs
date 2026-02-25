@@ -1,8 +1,10 @@
 using Anthropic.SDK;
-using Anthropic.SDK.Messaging;
 using FaiaChat.Api.Models;
 using FaiaChat.Api.Services;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.AI;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,12 +14,15 @@ builder.Services.AddHttpClient("notion");
 builder.Services.AddSingleton<NotionContentService>();
 builder.Services.AddSingleton<SystemPromptBuilder>();
 
-builder.Services.AddSingleton<AnthropicClient>(sp =>
+// Register Anthropic's IChatClient via Semantic Kernel
+builder.Services.AddSingleton<IChatCompletionService>(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
     var apiKey = config["Anthropic:ApiKey"]
         ?? throw new InvalidOperationException("Anthropic:ApiKey is not configured");
-    return new AnthropicClient(new APIAuthentication(apiKey));
+    var anthropicClient = new AnthropicClient(new APIAuthentication(apiKey));
+    IChatClient chatClient = anthropicClient.Messages;
+    return chatClient.AsChatCompletionService();
 });
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
@@ -35,12 +40,15 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddRateLimiter(options =>
 {
-    options.AddFixedWindowLimiter("chat", opt =>
-    {
-        opt.PermitLimit = 5;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
-    });
+    options.AddPolicy("chat", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
     options.RejectionStatusCode = 429;
 });
 
@@ -50,7 +58,7 @@ app.UseRateLimiter();
 
 app.MapGet("/health", () => "OK");
 
-app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptBuilder, AnthropicClient anthropic, HttpContext context) =>
+app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptBuilder, IChatCompletionService chatService, HttpContext context) =>
 {
     // 1. Validate
     if (request.Messages is null || request.Messages.Count == 0)
@@ -63,23 +71,26 @@ app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptB
     // 2. Build system prompt
     var systemPrompt = await promptBuilder.BuildAsync();
 
-    // 3. Convert ChatMessages to Anthropic SDK Messages
-    var messages = request.Messages.Select(m =>
-    {
-        var role = m.Role.ToLowerInvariant() == "assistant"
-            ? RoleType.Assistant
-            : RoleType.User;
-        return new Message(role, m.Content);
-    }).ToList();
+    // 3. Build ChatHistory with system prompt and conversation messages
+    var chatHistory = new ChatHistory();
+    chatHistory.AddSystemMessage(systemPrompt);
 
-    // 4. Build parameters
-    var parameters = new MessageParameters
+    foreach (var msg in request.Messages)
     {
-        Model = "claude-sonnet-4-20250514",
-        MaxTokens = 1024,
-        Stream = true,
-        System = new List<SystemMessage> { new SystemMessage(systemPrompt) },
-        Messages = messages
+        if (msg.Role.Equals("assistant", StringComparison.OrdinalIgnoreCase))
+            chatHistory.AddAssistantMessage(msg.Content);
+        else
+            chatHistory.AddUserMessage(msg.Content);
+    }
+
+    // 4. Configure execution settings
+    var executionSettings = new PromptExecutionSettings
+    {
+        ModelId = "claude-sonnet-4-20250514",
+        ExtensionData = new Dictionary<string, object>
+        {
+            ["max_tokens"] = 1024
+        }
     };
 
     // 5. Set up SSE response
@@ -87,14 +98,15 @@ app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptB
     context.Response.Headers.CacheControl = "no-cache";
     context.Response.Headers.Connection = "keep-alive";
 
-    // 6. Stream response from Claude
+    // 6. Stream response from Claude via Semantic Kernel
     try
     {
-        await foreach (var messageResponse in anthropic.Messages.StreamClaudeMessageAsync(parameters, context.RequestAborted))
+        await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(chatHistory, executionSettings, cancellationToken: context.RequestAborted))
         {
-            if (messageResponse.Delta?.Text is { } text)
+            if (chunk.Content is { } text && text.Length > 0)
             {
-                await context.Response.WriteAsync($"data: {text}\n\n", context.RequestAborted);
+                var sseText = text.Replace("\n", "\ndata: ");
+                await context.Response.WriteAsync($"data: {sseText}\n\n", context.RequestAborted);
                 await context.Response.Body.FlushAsync(context.RequestAborted);
             }
         }
