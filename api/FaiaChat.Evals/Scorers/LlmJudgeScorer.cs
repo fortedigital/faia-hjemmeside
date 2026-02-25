@@ -112,7 +112,7 @@ public partial class LlmJudgeScorer
         {
             var match = Regex.Match(
                 response,
-                $@"^{Regex.Escape(dimension)}:\s*(\d)\s+(.*)",
+                $@"^{Regex.Escape(dimension)}:\s*\[?(\d)\]?\s+(.*)",
                 RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
             if (match.Success && int.TryParse(match.Groups[1].Value, out var score) && score >= 1 && score <= 5)

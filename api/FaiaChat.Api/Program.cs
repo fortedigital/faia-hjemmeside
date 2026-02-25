@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Threading.RateLimiting;
+using System.ClientModel;
 using zborek.Langfuse;
 using zborek.Langfuse.OpenTelemetry;
 using zborek.Langfuse.OpenTelemetry.Models;
@@ -53,7 +54,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = builder.Environment.IsDevelopment() ? 60 : 5,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -136,6 +137,14 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
     catch (OperationCanceledException)
     {
         return Results.Empty;
+    }
+    catch (Exception ex) when (ex.InnerException is ClientResultException
+        || ex is ClientResultException
+        || ex.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase))
+    {
+        // Azure OpenAI content filter rejection
+        await context.Response.WriteAsync("data: Beklager, jeg kan ikke svare på det. Kan jeg hjelpe deg med noe annet?\n\n");
+        await context.Response.Body.FlushAsync();
     }
 
     // 9. Complete Langfuse generation with output
