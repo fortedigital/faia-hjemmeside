@@ -1,3 +1,4 @@
+import Chat from '../../components/Chat/Chat'
 import styles from './Home.module.scss'
 
 function Home() {
@@ -12,6 +13,11 @@ function Home() {
           AI-løsning på 6 uker. Vi bygger i deres miljø, med deres data, og
           måler reell effekt.
         </p>
+      </section>
+
+      <section className={styles.chatSection}>
+        <h2 className={styles.chatHeading}>Snakk med oss</h2>
+        <Chat />
       </section>
     </div>
   )

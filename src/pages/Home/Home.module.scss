@@ -30,3 +30,16 @@
   opacity: 0.7;
   max-width: 560px;
 }
+
+.chatSection {
+  padding-bottom: $spacing-2xl;
+}
+
+.chatHeading {
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: $color-black;
+  opacity: 0.5;
+  text-align: center;
+  margin-bottom: $spacing-md;
+}
