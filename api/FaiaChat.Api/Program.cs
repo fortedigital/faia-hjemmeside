@@ -1,8 +1,6 @@
-using Anthropic.SDK;
 using FaiaChat.Api.Models;
 using FaiaChat.Api.Services;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Threading.RateLimiting;
@@ -14,16 +12,16 @@ builder.Services.AddHttpClient("notion");
 builder.Services.AddSingleton<NotionContentService>();
 builder.Services.AddSingleton<SystemPromptBuilder>();
 
-// Register Anthropic's IChatClient via Semantic Kernel
-builder.Services.AddSingleton<IChatCompletionService>(sp =>
-{
-    var config = sp.GetRequiredService<IConfiguration>();
-    var apiKey = config["Anthropic:ApiKey"]
-        ?? throw new InvalidOperationException("Anthropic:ApiKey is not configured");
-    var anthropicClient = new AnthropicClient(new APIAuthentication(apiKey));
-    IChatClient chatClient = anthropicClient.Messages;
-    return chatClient.AsChatCompletionService();
-});
+// Register Azure OpenAI via Semantic Kernel
+var azureOpenAI = builder.Configuration.GetSection("AzureOpenAI");
+var endpoint = azureOpenAI["Endpoint"]
+    ?? throw new InvalidOperationException("AzureOpenAI:Endpoint is not configured");
+var apiKey = azureOpenAI["ApiKey"]
+    ?? throw new InvalidOperationException("AzureOpenAI:ApiKey is not configured");
+var deploymentName = azureOpenAI["DeploymentName"]
+    ?? throw new InvalidOperationException("AzureOpenAI:DeploymentName is not configured");
+
+builder.Services.AddAzureOpenAIChatCompletion(deploymentName, endpoint, apiKey);
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
     ?? new[] { "http://localhost:5173" };
@@ -58,7 +56,7 @@ app.UseRateLimiter();
 
 app.MapGet("/health", () => "OK");
 
-app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptBuilder, IChatCompletionService chatService, HttpContext context) =>
+app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chatService, SystemPromptBuilder promptBuilder, HttpContext context) =>
 {
     // 1. Validate
     if (request.Messages is null || request.Messages.Count == 0)
@@ -71,7 +69,7 @@ app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptB
     // 2. Build system prompt
     var systemPrompt = await promptBuilder.BuildAsync();
 
-    // 3. Build ChatHistory with system prompt and conversation messages
+    // 3. Build ChatHistory
     var chatHistory = new ChatHistory();
     chatHistory.AddSystemMessage(systemPrompt);
 
@@ -83,25 +81,15 @@ app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptB
             chatHistory.AddUserMessage(msg.Content);
     }
 
-    // 4. Configure execution settings
-    var executionSettings = new PromptExecutionSettings
-    {
-        ModelId = "claude-sonnet-4-20250514",
-        ExtensionData = new Dictionary<string, object>
-        {
-            ["max_tokens"] = 1024
-        }
-    };
-
-    // 5. Set up SSE response
+    // 4. Set up SSE response
     context.Response.ContentType = "text/event-stream";
     context.Response.Headers.CacheControl = "no-cache";
     context.Response.Headers.Connection = "keep-alive";
 
-    // 6. Stream response from Claude via Semantic Kernel
+    // 5. Stream response via Semantic Kernel
     try
     {
-        await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(chatHistory, executionSettings, cancellationToken: context.RequestAborted))
+        await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(chatHistory, cancellationToken: context.RequestAborted))
         {
             if (chunk.Content is { } text && text.Length > 0)
             {
@@ -113,11 +101,11 @@ app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptB
     }
     catch (OperationCanceledException)
     {
-        // Client disconnected — this is expected
+        // Client disconnected
         return Results.Empty;
     }
 
-    // 7. Send [DONE] marker
+    // 6. Send [DONE] marker
     await context.Response.WriteAsync("data: [DONE]\n\n");
     await context.Response.Body.FlushAsync();
 
