@@ -26,13 +26,29 @@ var deploymentName = azureOpenAI["DeploymentName"]
 builder.Services.AddAzureOpenAIChatCompletion(deploymentName, endpoint, apiKey);
 
 // Register Langfuse tracing
+var langfuseSection = builder.Configuration.GetSection("Langfuse");
+var langfusePublicKey = langfuseSection["PublicKey"] ?? "";
+var langfuseSecretKey = langfuseSection["SecretKey"] ?? "";
+var langfuseEnabled = !string.IsNullOrEmpty(langfusePublicKey) && !string.IsNullOrEmpty(langfuseSecretKey);
+
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {
-        tracing.AddLangfuseExporter(builder.Configuration.GetSection("Langfuse"));
+        tracing.AddSource("Langfuse");
+        if (langfuseEnabled)
+        {
+            tracing.AddLangfuseExporter(options =>
+            {
+                options.PublicKey = langfusePublicKey;
+                options.SecretKey = langfuseSecretKey;
+                options.Url = langfuseSection["Url"] ?? "http://localhost:3000";
+                options.OnlyGenAiActivities = false;
+            });
+        }
     });
 builder.Services.AddLangfuseTracing();
 builder.Services.AddLangfuse(builder.Configuration);
+LangfuseOtlpExtensions.UseLangfuseActivityListener();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
     ?? new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:5175" };
@@ -121,6 +137,7 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
 
     // 8. Stream response via Semantic Kernel
     var fullResponse = new System.Text.StringBuilder();
+    var finishReason = "stop";
     try
     {
         await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(chatHistory, executionSettings, kernel: null, context.RequestAborted))
@@ -143,7 +160,11 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
         || ex.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase))
     {
         // Azure OpenAI content filter rejection
-        await context.Response.WriteAsync("data: Beklager, jeg kan ikke svare på det. Kan jeg hjelpe deg med noe annet?\n\n");
+        finishReason = "content_filter";
+        var fallback = "Beklager, jeg kan ikke svare på det. Kan jeg hjelpe deg med noe annet?";
+        fullResponse.Clear();
+        fullResponse.Append(fallback);
+        await context.Response.WriteAsync($"data: {fallback}\n\n");
         await context.Response.Body.FlushAsync();
     }
 
@@ -152,7 +173,7 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
     {
         Model = deploymentName,
         Completion = fullResponse.ToString(),
-        FinishReasons = ["stop"]
+        FinishReasons = [finishReason]
     });
 
     langfuseTrace.SetOutput(new { response = fullResponse.ToString() });

@@ -61,10 +61,10 @@ public partial class LlmJudgeScorer
         sb.AppendLine($"Personaen som ble simulert heter \"{personaName}\".");
         sb.AppendLine($"Forventet spor (track): {expectedTrack}");
         sb.AppendLine("FAIA har fire spor:");
-        sb.AppendLine("  A = AI Automatisering (automatisere repetitive prosesser)");
-        sb.AppendLine("  B = Skreddersydd AI-agent (bygge tilpassede AI-verktøy)");
-        sb.AppendLine("  C = AI Strategi & Rådgivning (strategisk rådgivning for ledere)");
-        sb.AppendLine("  D = Opportunity Sprint (kort utforskningssprint for å finne AI-muligheter)");
+        sb.AppendLine("  A = Prosessautomatisering & AI-agenter (automatisere manuelle prosesser med AI-agenter)");
+        sb.AppendLine("  B = Dataintelligens & Beslutningsstøtte (bruke eksisterende data til innsikt og beslutningsstøtte)");
+        sb.AppendLine("  C = Ny AI-drevet applikasjon (bygge ny fullstack-app med AI i kjernen)");
+        sb.AppendLine("  D = Intelligent oppgradering (legge AI-kapabiliteter til eksisterende system)");
         sb.AppendLine();
         sb.AppendLine("Samtalen:");
         sb.AppendLine("---");

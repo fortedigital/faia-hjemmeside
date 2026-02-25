@@ -15,8 +15,8 @@ x-langfuse-worker-env: &langfuse-worker-env
   LANGFUSE_INIT_ORG_NAME: "My Org"
   LANGFUSE_INIT_PROJECT_ID: "my-project"
   LANGFUSE_INIT_PROJECT_NAME: "My Project"
-  LANGFUSE_INIT_PROJECT_PUBLIC_KEY: "lf_pk_1234567890"
-  LANGFUSE_INIT_PROJECT_SECRET_KEY: "lf_sk_1234567890"
+  LANGFUSE_INIT_PROJECT_PUBLIC_KEY: "pk-lf-3ca01e52-6d75-4e62-bb86-0e4dd26fdf8e"
+  LANGFUSE_INIT_PROJECT_SECRET_KEY: "sk-lf-4012d5fd-b327-481d-a97e-d29ad516c6d6"
   LANGFUSE_INIT_USER_EMAIL: "dev@faia.no"
   LANGFUSE_INIT_USER_NAME: "Dev User"
   LANGFUSE_INIT_USER_PASSWORD: "changeme123!"
@@ -47,7 +47,7 @@ services:
     image: langfuse/langfuse:3
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       <<: *langfuse-worker-env
       HOSTNAME: "0.0.0.0"
@@ -150,6 +150,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9090 minioadmin minioadmin;
+      mc mb local/langfuse --ignore-existing;
+      mc mb local/langfuse-media --ignore-existing;
+      exit 0;
+      "
 
 volumes:
   postgres_data:

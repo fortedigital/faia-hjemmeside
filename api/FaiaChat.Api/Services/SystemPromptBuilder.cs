@@ -6,16 +6,14 @@ namespace FaiaChat.Api.Services;
 public class SystemPromptBuilder
 {
     private readonly ILangfuseClient _langfuse;
-    private string? _cachedPrompt;
-    private DateTime _cacheExpiry;
+    private static string? _cachedPrompt;
+    private static DateTime _cacheExpiry;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     public SystemPromptBuilder(ILangfuseClient langfuse)
     {
         _langfuse = langfuse;
     }
-
-    public string Build() => BuildFallback();
 
     public async Task<string> BuildAsync()
     {
