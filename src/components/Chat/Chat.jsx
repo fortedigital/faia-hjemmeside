@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
+import Markdown from 'react-markdown'
 import { welcomeMessage } from '../../data/chatResponses'
 import styles from './Chat.module.scss'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || ''
 const MAX_USER_MESSAGES = 20
 
 function Chat() {
@@ -132,7 +133,11 @@ function Chat() {
             key={msg.id}
             className={`${styles.message} ${styles[msg.sender]} ${msg.isError ? styles.error : ''}`}
           >
-            {msg.text}
+            {msg.sender === 'bot' ? (
+              <Markdown>{msg.text}</Markdown>
+            ) : (
+              msg.text
+            )}
             {msg.isError && (
               <button className={styles.retryButton} onClick={() => handleRetry(msg.id)}>
                 Prøv igjen
