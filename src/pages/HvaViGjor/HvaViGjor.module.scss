@@ -1,0 +1,170 @@
+@use '../../styles/variables' as *;
+
+.page {
+  max-width: $max-width;
+  margin: 0 auto;
+  padding: 0 $spacing-md;
+}
+
+// Section 1 - Intro
+.intro {
+  padding: $spacing-2xl 0 $spacing-xl;
+}
+
+.headline {
+  font-size: $font-size-3xl;
+  font-weight: 700;
+  color: $color-black;
+  margin-bottom: $spacing-sm;
+}
+
+.introText {
+  font-size: $font-size-lg;
+  color: $color-black;
+  opacity: 0.7;
+  max-width: 640px;
+  line-height: 1.6;
+}
+
+// Section 2 - Tracks
+.tracks {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xl;
+  padding-bottom: $spacing-xl;
+}
+
+.track {
+  padding-bottom: $spacing-xl;
+  border-bottom: 1px solid $color-border;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.trackHeader {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+}
+
+.trackLetter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: $color-primary;
+  color: $color-white;
+  font-size: $font-size-sm;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.trackName {
+  font-size: $font-size-xl;
+  font-weight: 600;
+  color: $color-black;
+}
+
+.tagline {
+  font-style: italic;
+  color: $color-black;
+  opacity: 0.6;
+  border-left: 3px solid $color-primary;
+  padding-left: $spacing-sm;
+  margin-bottom: $spacing-md;
+  line-height: 1.6;
+}
+
+.trackDescription {
+  font-size: $font-size-base;
+  line-height: 1.6;
+  color: $color-black;
+  max-width: 640px;
+  margin-bottom: $spacing-sm;
+}
+
+.examples {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.example {
+  font-size: $font-size-sm;
+  color: $color-black;
+  padding-left: $spacing-sm;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: $color-primary;
+  }
+}
+
+// Section 3 - Outcomes
+.outcomesSection {
+  padding: $spacing-xl 0;
+  border-top: 1px solid $color-border;
+}
+
+.sectionHeading {
+  font-size: $font-size-2xl;
+  font-weight: 700;
+  color: $color-black;
+  margin-bottom: $spacing-lg;
+}
+
+.outcomesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $spacing-md;
+
+  @media (max-width: $breakpoint-mobile) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.outcome {
+  padding: $spacing-md;
+}
+
+.outcomeTitle {
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: $color-black;
+  margin-bottom: $spacing-xs;
+}
+
+.outcomeDescription {
+  font-size: $font-size-sm;
+  line-height: 1.6;
+  color: $color-black;
+  opacity: 0.7;
+}
+
+// Section 4 - Value proposition
+.valueSection {
+  padding: $spacing-xl 0 $spacing-2xl;
+}
+
+.valueQuote {
+  font-size: $font-size-lg;
+  font-style: italic;
+  line-height: 1.7;
+  color: $color-black;
+  border-left: 3px solid $color-primary;
+  padding-left: $spacing-md;
+  max-width: 700px;
+}
