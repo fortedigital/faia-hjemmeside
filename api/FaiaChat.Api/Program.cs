@@ -85,6 +85,7 @@ app.MapPost("/api/chat", async (ChatRequest request, SystemPromptBuilder promptB
     catch (OperationCanceledException)
     {
         // Client disconnected — this is expected
+        return Results.Empty;
     }
 
     // 7. Send [DONE] marker
