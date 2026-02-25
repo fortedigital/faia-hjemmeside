@@ -1,4 +1,11 @@
+using FaiaChat.Api.Models;
+using FaiaChat.Api.Services;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<NotionConfig>(builder.Configuration.GetSection("Notion"));
+builder.Services.AddHttpClient<NotionContentService>();
+builder.Services.AddSingleton<NotionContentService>();
 
 builder.Services.AddCors(options =>
 {
