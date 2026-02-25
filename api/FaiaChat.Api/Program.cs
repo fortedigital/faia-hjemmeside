@@ -7,9 +7,6 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.Configure<NotionConfig>(builder.Configuration.GetSection("Notion"));
-builder.Services.AddHttpClient("notion");
-builder.Services.AddSingleton<NotionContentService>();
 builder.Services.AddSingleton<SystemPromptBuilder>();
 
 // Register Azure OpenAI via Semantic Kernel
@@ -67,7 +64,7 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
         return Results.BadRequest(new { error = "Message limit exceeded" });
 
     // 2. Build system prompt
-    var systemPrompt = await promptBuilder.BuildAsync();
+    var systemPrompt = promptBuilder.Build();
 
     // 3. Build ChatHistory
     var chatHistory = new ChatHistory();
