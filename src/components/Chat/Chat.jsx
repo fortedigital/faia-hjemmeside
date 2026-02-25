@@ -5,17 +5,31 @@ import styles from './Chat.module.scss'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 function Chat() {
-  const [messages, setMessages] = useState([
-    { id: 1, sender: 'bot', text: welcomeMessage },
-  ])
+  const [messages, setMessages] = useState(() => {
+    const saved = sessionStorage.getItem('faia-chat-messages')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch {
+        return [{ id: 1, sender: 'bot', text: welcomeMessage }]
+      }
+    }
+    return [{ id: 1, sender: 'bot', text: welcomeMessage }]
+  })
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef(null)
-  const nextIdRef = useRef(2)
+  const nextIdRef = useRef(
+    messages.reduce((max, m) => Math.max(max, m.id), 0) + 1
+  )
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
+
+  useEffect(() => {
+    sessionStorage.setItem('faia-chat-messages', JSON.stringify(messages))
+  }, [messages])
 
   const handleSend = async () => {
     const trimmed = inputValue.trim()
