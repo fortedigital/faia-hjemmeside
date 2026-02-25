@@ -4,6 +4,9 @@
 # Start:  docker compose up -d
 # Stop:   docker compose down
 # Nuke:   docker compose down -v   (deletes all data)
+#
+# The init keys below bootstrap a default project on first start.
+# Use the same keys in appsettings.Development.json to connect the API.
 
 x-langfuse-worker-env: &langfuse-worker-env
   DATABASE_URL: postgresql://langfuse:langfuse@postgres:5432/langfuse
@@ -15,8 +18,8 @@ x-langfuse-worker-env: &langfuse-worker-env
   LANGFUSE_INIT_ORG_NAME: "My Org"
   LANGFUSE_INIT_PROJECT_ID: "my-project"
   LANGFUSE_INIT_PROJECT_NAME: "My Project"
-  LANGFUSE_INIT_PROJECT_PUBLIC_KEY: "pk-lf-3ca01e52-6d75-4e62-bb86-0e4dd26fdf8e"
-  LANGFUSE_INIT_PROJECT_SECRET_KEY: "sk-lf-4012d5fd-b327-481d-a97e-d29ad516c6d6"
+  LANGFUSE_INIT_PROJECT_PUBLIC_KEY: "lf_pk_dev_local_placeholder"
+  LANGFUSE_INIT_PROJECT_SECRET_KEY: "lf_sk_dev_local_placeholder"
   LANGFUSE_INIT_USER_EMAIL: "dev@faia.no"
   LANGFUSE_INIT_USER_NAME: "Dev User"
   LANGFUSE_INIT_USER_PASSWORD: "changeme123!"
@@ -39,6 +42,7 @@ x-langfuse-worker-env: &langfuse-worker-env
   LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: "minioadmin"
   LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: "minioadmin"
   LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_ENABLE_OTEL_INGESTION: "true"
   LANGFUSE_INGESTION_QUEUE_DELAY_MS: "100"
   LANGFUSE_INGESTION_CLICKHOUSE_WRITE_INTERVAL_MS: "5000"
 
