@@ -33,7 +33,7 @@ function Header() {
               `${styles.navLink} ${isActive ? styles.active : ''}`
             }
           >
-            Hva vi gjor
+            Hva vi gjør
           </NavLink>
         </nav>
       </div>
