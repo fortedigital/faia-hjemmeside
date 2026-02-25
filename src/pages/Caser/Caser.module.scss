@@ -1,0 +1,37 @@
+@use '../../styles/variables' as *;
+
+.page {
+  max-width: $max-width;
+  margin: 0 auto;
+  padding: 0 $spacing-md;
+}
+
+.header {
+  padding: $spacing-2xl 0 $spacing-xl;
+}
+
+.headline {
+  font-size: $font-size-3xl;
+  font-weight: 700;
+  color: $color-black;
+  margin-bottom: $spacing-sm;
+}
+
+.subtitle {
+  font-size: $font-size-lg;
+  color: $color-black;
+  opacity: 0.7;
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-md;
+  padding-bottom: $spacing-2xl;
+
+  @media (max-width: $breakpoint-mobile) {
+    grid-template-columns: 1fr;
+  }
+}
