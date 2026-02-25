@@ -3,6 +3,7 @@ namespace FaiaChat.Api.Models;
 public class ChatRequest
 {
     public List<ChatMessage> Messages { get; set; } = new();
+    public string? SessionId { get; set; }
 }
 
 public class ChatMessage

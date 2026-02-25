@@ -1,20 +1,66 @@
+using zborek.Langfuse.Client;
+using zborek.Langfuse.Models.Prompt;
+
 namespace FaiaChat.Api.Services;
 
 public class SystemPromptBuilder
 {
-    public string Build()
+    private readonly ILangfuseClient _langfuse;
+    private string? _cachedPrompt;
+    private DateTime _cacheExpiry;
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
+    public SystemPromptBuilder(ILangfuseClient langfuse)
+    {
+        _langfuse = langfuse;
+    }
+
+    public string Build() => BuildFallback();
+
+    public async Task<string> BuildAsync()
+    {
+        if (_cachedPrompt is not null && DateTime.UtcNow < _cacheExpiry)
+            return _cachedPrompt;
+
+        try
+        {
+            var prompt = await _langfuse.GetPromptAsync("faia-system-prompt", label: "production");
+            if (prompt is TextPrompt textPrompt)
+            {
+                var template = textPrompt.PromptText;
+                var compiled = template.Replace("{{knowledge}}", Content);
+                _cachedPrompt = compiled;
+                _cacheExpiry = DateTime.UtcNow.Add(CacheTtl);
+                return compiled;
+            }
+        }
+        catch
+        {
+            // Fallback to hardcoded prompt if Langfuse is unavailable
+        }
+
+        return BuildFallback();
+    }
+
+    private string BuildFallback()
     {
         return $"""
-            Du er FAIA-assistenten, en profesjonell og saklig rådgiver for Forte AI Accelerator.
+            Du er FAIA, en erfaren rådgiver hos Forte som hjelper potensielle kunder å forstå AI Accelerator.
 
-            Instruksjoner:
-            - Svar kun basert på innholdet nedenfor. Ikke spekuler eller finn på informasjon.
-            - Hvis spørsmålet er utenfor det du kan svare på, si det ærlig og oppfordre brukeren til å ta kontakt med FAIA direkte på e-post: kontakt@faia.no
-            - Svar på norsk.
-            - Vær kort og konsist. Profesjonell tone.
+            Slik oppfører du deg:
+            - Du svarer ALLTID med maks 2-3 korte setninger. Aldri mer.
+            - Du avslutter ALLTID svaret med ett relevant oppfølgingsspørsmål for å forstå brukerens situasjon bedre.
+            - Du skriver som i en uformell chat — ingen lister, ingen overskrifter, ingen markdown-formatering, ingen punktlister, ingen nummererte punkter. Bare vanlige setninger.
+            - Du er en aktiv guide som styrer samtalen. Still spørsmål for å identifisere riktig spor (A: Prosessautomatisering, B: Dataintelligens, C: Ny app, D: Oppgradering).
+            - Når du har forstått brukerens behov og identifisert riktig spor, oppsummer kort og avslutt med: "Vil du ta en prat med teamet? Book et møte her: https://forte.no/kontakt"
+            - Etter at du har foreslått å booke møte, si noe hyggelig som avslutning. IKKE fortsett å stille spørsmål. Samtalen er ferdig.
+            - Du kan IKKE booke møter, sende e-post, sende kalenderinvitasjoner, eller gjøre noe utenfor denne chatten. Du er kun en informasjonsassistent. Aldri lat som om du kan utføre handlinger.
+            - Aldri be om personlig informasjon som e-post, telefonnummer eller navn.
+            - Svar kun basert på kunnskapen nedenfor. Hvis du ikke vet, si det ærlig og tilby å koble brukeren med teamet via lenken over.
+            - Svar på norsk. Varm og direkte tone, som en erfaren konsulent.
             - Ikke bruk emojier.
 
-            Her er informasjonen du har tilgjengelig:
+            Kunnskap:
 
             {Content}
             """;

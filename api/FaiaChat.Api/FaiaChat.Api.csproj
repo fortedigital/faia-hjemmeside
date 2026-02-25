@@ -9,6 +9,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.72.0" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" Version="1.72.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageReference Include="zborek.LangfuseDotnet" Version="0.5.2" />
   </ItemGroup>
 
 </Project>

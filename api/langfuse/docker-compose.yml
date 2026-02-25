@@ -23,6 +23,8 @@ x-langfuse-worker-env: &langfuse-worker-env
   REDIS_CONNECTION_STRING: "redis://:myredissecret@redis:6379/0"
   CLICKHOUSE_URL: "http://clickhouse:8123"
   CLICKHOUSE_MIGRATION_URL: "clickhouse://clickhouse:9000"
+  CLICKHOUSE_USER: "default"
+  CLICKHOUSE_PASSWORD: "clickhouse"
   LANGFUSE_S3_EVENT_UPLOAD_ENABLED: "true"
   LANGFUSE_S3_EVENT_UPLOAD_BUCKET: "langfuse"
   LANGFUSE_S3_EVENT_UPLOAD_REGION: "auto"
@@ -103,10 +105,11 @@ services:
       - "127.0.0.1:9000:9000"
     environment:
       CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_PASSWORD: clickhouse
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
+      - ./clickhouse-config.xml:/etc/clickhouse-server/config.d/keeper.xml:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost:8123/ping"]
       interval: 5s
@@ -143,7 +146,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-f", "http://localhost:9090/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 10

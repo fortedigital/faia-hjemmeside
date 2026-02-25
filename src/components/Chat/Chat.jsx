@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import Markdown from 'react-markdown'
 import { welcomeMessage } from '../../data/chatResponses'
 import styles from './Chat.module.scss'
 
@@ -133,11 +132,7 @@ function Chat() {
             key={msg.id}
             className={`${styles.message} ${styles[msg.sender]} ${msg.isError ? styles.error : ''}`}
           >
-            {msg.sender === 'bot' ? (
-              <Markdown>{msg.text}</Markdown>
-            ) : (
-              msg.text
-            )}
+            {msg.text}
             {msg.isError && (
               <button className={styles.retryButton} onClick={() => handleRetry(msg.id)}>
                 Prøv igjen

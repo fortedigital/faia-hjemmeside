@@ -34,25 +34,7 @@
   border-radius: 12px;
   font-size: $font-size-sm;
   line-height: 1.5;
-
-  p {
-    margin: 0 0 8px 0;
-    &:last-child { margin-bottom: 0; }
-  }
-
-  ul, ol {
-    margin: 4px 0 8px 0;
-    padding-left: 20px;
-    &:last-child { margin-bottom: 0; }
-  }
-
-  li {
-    margin-bottom: 2px;
-  }
-
-  strong {
-    font-weight: 600;
-  }
+  white-space: pre-wrap;
 }
 
 .bot {
