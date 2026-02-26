@@ -10,7 +10,7 @@ Dobbelt formål: lære SK plugin-mønsteret, og forbedre chatresponsene ved at k
 
 ## Tilnærming
 
-**SK Native Plugins med Auto Function Calling.** En C#-klasse med `[KernelFunction]`-dekorerte metoder registreres i en SK `Kernel`. Modellen kaller plugins selv via `ToolCallBehavior.AutoInvokeKernelFunctions`.
+**SK Native Plugins med Auto Function Calling.** En C#-klasse med `[KernelFunction]`-dekorerte metoder registreres i en SK `Kernel`. Modellen kaller plugins selv via `FunctionChoiceBehavior.Auto()` (den nye, ikke-deprecated API-en i SK 1.72.0).
 
 ### Valgt fremfor
 
@@ -56,8 +56,8 @@ Oppførselsregler er uendret fra i dag: maks 2-3 setninger, avslutt med oppfølg
 ## Kernel-oppsett
 
 - `builder.Services.AddKernel()` + `AddAzureOpenAIChatCompletion()`
-- Plugin registreres via `kernel.Plugins.AddFromType<FaiaAcceleratorPlugin>()`
-- Execution settings bruker `AzureOpenAIPromptExecutionSettings` med `ToolCallBehavior.AutoInvokeKernelFunctions`
+- Plugin registreres via `kernelBuilder.Plugins.AddFromType<FaiaAcceleratorPlugin>()`
+- Execution settings bruker `PromptExecutionSettings` med `FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()`
 - Streaming-kallet beholder `chatService.GetStreamingChatMessageContentsAsync()` men sender `kernel` inn i stedet for `null`
 
 ## Filendringer
