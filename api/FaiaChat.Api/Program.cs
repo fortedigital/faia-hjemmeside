@@ -58,26 +58,52 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(allowedOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+              .WithMethods("POST", "GET")
+              .WithHeaders("Content-Type");
     });
 });
 
+var isDev = builder.Environment.IsDevelopment();
+
 builder.Services.AddRateLimiter(options =>
 {
-    options.AddPolicy("chat", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = builder.Environment.IsDevelopment() ? 60 : 5,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
     options.RejectionStatusCode = 429;
+    options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
+        ChatRateLimiter(isDev ? 60 : 5, TimeSpan.FromMinutes(1)),
+        ChatRateLimiter(isDev ? 600 : 50, TimeSpan.FromHours(1)),
+        ChatRateLimiter(isDev ? 5000 : 200, TimeSpan.FromDays(1)));
 });
 
+static PartitionedRateLimiter<HttpContext> ChatRateLimiter(int permitLimit, TimeSpan window) =>
+    PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        if (!context.Request.Path.StartsWithSegments("/api/chat"))
+            return RateLimitPartition.GetNoLimiter("");
+        return RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = window,
+                QueueLimit = 0
+            });
+    });
+
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'";
+    if (!app.Environment.IsDevelopment())
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    await next();
+});
+
 app.UseCors();
 app.UseRateLimiter();
 
@@ -88,6 +114,10 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
     // 1. Validate
     if (request.Messages is null || request.Messages.Count == 0)
         return Results.BadRequest(new { error = "Messages required" });
+
+    if (request.Messages.Any(m => !m.Role.Equals("user", StringComparison.OrdinalIgnoreCase)
+                                  && !m.Role.Equals("assistant", StringComparison.OrdinalIgnoreCase)))
+        return Results.BadRequest(new { error = "Invalid role. Allowed: user, assistant" });
 
     if (request.Messages.Count > 40)
         return Results.BadRequest(new { error = "Message limit exceeded" });
@@ -190,6 +220,6 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
     await context.Response.Body.FlushAsync();
 
     return Results.Empty;
-}).RequireRateLimiting("chat");
+});
 
 app.Run();
