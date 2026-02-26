@@ -148,12 +148,14 @@ public class FaiaAcceleratorPlugin
 
     #region Objections
 
+    // Ordered by priority: first matching entry wins.
+    // Keywords are matched as substrings — avoid overly broad words that appear in unrelated contexts.
     private static readonly (string[] Keywords, string Response)[] Objections =
     [
-        (["kort", "tid", "6 uke", "seks uke", "for lite tid"],
+        (["kort", "6 uke", "seks uke", "for lite tid"],
             "«6 uker er for kort» — Vi bygger den ene tingen som beviser verdien. Startpakken eliminerer uker med oppsett."),
 
-        (["data", "klar", "kvalitet", "ryddig"],
+        (["datakvalitet", "data ikke klar", "ryddig", "ikke klare"],
             "«Dataene våre er ikke klare» — Vi tilbyr en fokusert mini-dataplattform — avgrenser, strukturerer, og gjør nyttig nå."),
 
         (["fungere", "feil", "risiko", "garanti"],
@@ -162,7 +164,7 @@ public class FaiaAcceleratorPlugin
         (["selv", "egen", "internt", "bygge"],
             "«Vi vil bygge dette selv» — Alt vi bygger er deres. Vi får dere til validert utgangspunkt 10x raskere."),
 
-        (["strategi", "allerede", "plan"],
+        (["strategi", "allerede"],
             "«Vi har allerede en AI-strategi» — AI Accelerator kompletterer strategi med gjennomføring."),
 
         (["infra", "oppsett", "miljø"],
