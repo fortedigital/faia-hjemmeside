@@ -1,0 +1,175 @@
+# Langfuse v3 self-hosted stack
+# Docs: https://langfuse.com/docs/deployment/self-host
+#
+# Start:  docker compose up -d
+# Stop:   docker compose down
+# Nuke:   docker compose down -v   (deletes all data)
+#
+# The init keys below bootstrap a default project on first start.
+# Use the same keys in appsettings.Development.json to connect the API.
+
+x-langfuse-worker-env: &langfuse-worker-env
+  DATABASE_URL: postgresql://langfuse:langfuse@postgres:5432/langfuse
+  SALT: "saltsaltsaltsalt"
+  ENCRYPTION_KEY: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
+  NEXTAUTH_SECRET: "mysecretdev"
+  NEXTAUTH_URL: "http://localhost:3000"
+  LANGFUSE_INIT_ORG_ID: "my-org"
+  LANGFUSE_INIT_ORG_NAME: "My Org"
+  LANGFUSE_INIT_PROJECT_ID: "my-project"
+  LANGFUSE_INIT_PROJECT_NAME: "My Project"
+  LANGFUSE_INIT_PROJECT_PUBLIC_KEY: "lf_pk_dev_local_placeholder"
+  LANGFUSE_INIT_PROJECT_SECRET_KEY: "lf_sk_dev_local_placeholder"
+  LANGFUSE_INIT_USER_EMAIL: "dev@faia.no"
+  LANGFUSE_INIT_USER_NAME: "Dev User"
+  LANGFUSE_INIT_USER_PASSWORD: "changeme123!"
+  REDIS_CONNECTION_STRING: "redis://:myredissecret@redis:6379/0"
+  CLICKHOUSE_URL: "http://clickhouse:8123"
+  CLICKHOUSE_MIGRATION_URL: "clickhouse://clickhouse:9000"
+  CLICKHOUSE_USER: "default"
+  CLICKHOUSE_PASSWORD: "clickhouse"
+  LANGFUSE_S3_EVENT_UPLOAD_ENABLED: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: "langfuse"
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: "auto"
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: "http://minio:9090"
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: "minioadmin"
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: "minioadmin"
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_ENABLED: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: "langfuse-media"
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: "auto"
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: "http://minio:9090"
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: "minioadmin"
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: "minioadmin"
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_ENABLE_OTEL_INGESTION: "true"
+  LANGFUSE_INGESTION_QUEUE_DELAY_MS: "100"
+  LANGFUSE_INGESTION_CLICKHOUSE_WRITE_INTERVAL_MS: "5000"
+
+services:
+  langfuse-web:
+    image: langfuse/langfuse:3
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      <<: *langfuse-worker-env
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3030:3030"
+    environment:
+      <<: *langfuse-worker-env
+      PORT: "3030"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      - ./clickhouse-config.xml:/etc/clickhouse-server/config.d/keeper.xml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    command:
+      - redis-server
+      - "--requirepass"
+      - "myredissecret"
+      - "--maxmemory-policy"
+      - "noeviction"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "myredissecret", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+      - "127.0.0.1:9091:9091"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --address ":9090" --console-address ":9091"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9090 minioadmin minioadmin;
+      mc mb local/langfuse --ignore-existing;
+      mc mb local/langfuse-media --ignore-existing;
+      exit 0;
+      "
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  clickhouse_logs:
+  minio_data:
