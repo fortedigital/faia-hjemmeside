@@ -89,28 +89,35 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
     if (request.Messages is null || request.Messages.Count == 0)
         return Results.BadRequest(new { error = "Messages required" });
 
-    var userMessageCount = request.Messages.Count(m => m.Role == "user");
-    if (userMessageCount > 20)
+    if (request.Messages.Count > 40)
         return Results.BadRequest(new { error = "Message limit exceeded" });
+
+    if (request.Messages.Count % 2 == 0)
+        return Results.BadRequest(new { error = "Last message must be from user" });
+
+    const int maxMessageLength = 2000;
+    if (request.Messages.Any(m => m.Content.Length > maxMessageLength))
+        return Results.BadRequest(new { error = $"Message too long (max {maxMessageLength} characters)" });
 
     // 2. Start Langfuse trace
     langfuseTrace.StartTrace("faia-chat",
         sessionId: request.SessionId ?? Guid.NewGuid().ToString(),
-        input: new { userMessageCount });
+        input: new { messageCount = request.Messages.Count });
 
     // 3. Build system prompt
     var systemPrompt = await promptBuilder.BuildAsync();
 
-    // 4. Build ChatHistory
+    // 4. Build ChatHistory — enforce roles server-side, ignore client role field
     var chatHistory = new ChatHistory();
     chatHistory.AddSystemMessage(systemPrompt);
 
-    foreach (var msg in request.Messages)
+    for (var i = 0; i < request.Messages.Count; i++)
     {
-        if (msg.Role.Equals("assistant", StringComparison.OrdinalIgnoreCase))
-            chatHistory.AddAssistantMessage(msg.Content);
+        var content = request.Messages[i].Content;
+        if (i % 2 == 0)
+            chatHistory.AddUserMessage(content);
         else
-            chatHistory.AddUserMessage(msg.Content);
+            chatHistory.AddAssistantMessage(content);
     }
 
     // 5. Execution settings
