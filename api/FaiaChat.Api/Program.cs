@@ -5,10 +5,6 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Threading.RateLimiting;
 using System.ClientModel;
-using zborek.Langfuse;
-using zborek.Langfuse.OpenTelemetry;
-using zborek.Langfuse.OpenTelemetry.Models;
-using zborek.Langfuse.OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,34 +20,6 @@ var deploymentName = azureOpenAI["DeploymentName"]
     ?? throw new InvalidOperationException("AzureOpenAI:DeploymentName is not configured");
 
 builder.Services.AddAzureOpenAIChatCompletion(deploymentName, endpoint, apiKey);
-
-// Register Langfuse tracing
-var langfuseSection = builder.Configuration.GetSection("Langfuse");
-var langfusePublicKey = langfuseSection["PublicKey"] ?? "";
-var langfuseSecretKey = langfuseSection["SecretKey"] ?? "";
-var langfuseEnabled = !string.IsNullOrEmpty(langfusePublicKey) && !string.IsNullOrEmpty(langfuseSecretKey);
-
-builder.Services.AddOpenTelemetry()
-    .WithTracing(tracing =>
-    {
-        tracing.AddSource("Langfuse");
-        if (langfuseEnabled)
-        {
-            tracing.AddLangfuseExporter(options =>
-            {
-                options.PublicKey = langfusePublicKey;
-                options.SecretKey = langfuseSecretKey;
-                options.Url = langfuseSection["Url"] ?? "http://localhost:3000";
-                options.OnlyGenAiActivities = false;
-            });
-        }
-    });
-if (langfuseEnabled)
-{
-    builder.Services.AddLangfuseTracing();
-    builder.Services.AddLangfuse(builder.Configuration);
-    LangfuseOtlpExtensions.UseLangfuseActivityListener();
-}
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
     ?? new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:5175" };
@@ -112,7 +80,7 @@ app.UseRateLimiter();
 
 app.MapGet("/health", () => "OK");
 
-app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chatService, SystemPromptBuilder promptBuilder, IOtelLangfuseTrace langfuseTrace, HttpContext context) =>
+app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chatService, SystemPromptBuilder promptBuilder, HttpContext context) =>
 {
     // 1. Validate
     if (request.Messages is null || request.Messages.Count == 0)
@@ -132,15 +100,10 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
     if (request.Messages.Any(m => m.Content.Length > maxMessageLength))
         return Results.BadRequest(new { error = $"Message too long (max {maxMessageLength} characters)" });
 
-    // 2. Start Langfuse trace
-    langfuseTrace.StartTrace("faia-chat",
-        sessionId: request.SessionId ?? Guid.NewGuid().ToString(),
-        input: new { messageCount = request.Messages.Count });
-
-    // 3. Build system prompt
+    // 2. Build system prompt
     var systemPrompt = await promptBuilder.BuildAsync();
 
-    // 4. Build ChatHistory — enforce roles server-side, ignore client role field
+    // 3. Build ChatHistory — enforce roles server-side, ignore client role field
     var chatHistory = new ChatHistory();
     chatHistory.AddSystemMessage(systemPrompt);
 
@@ -153,7 +116,7 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
             chatHistory.AddAssistantMessage(content);
     }
 
-    // 5. Execution settings
+    // 4. Execution settings
     var executionSettings = new PromptExecutionSettings
     {
         ExtensionData = new Dictionary<string, object>
@@ -164,20 +127,13 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
         }
     };
 
-    // 6. Create Langfuse generation
-    using var generation = langfuseTrace.CreateGeneration("chat-completion",
-        model: deploymentName,
-        provider: "azure-openai",
-        input: new { messages = request.Messages });
-
-    // 7. Set up SSE response
+    // 5. Set up SSE response
     context.Response.ContentType = "text/event-stream";
     context.Response.Headers.CacheControl = "no-cache";
     context.Response.Headers.Connection = "keep-alive";
 
-    // 8. Stream response via Semantic Kernel
+    // 6. Stream response via Semantic Kernel
     var fullResponse = new System.Text.StringBuilder();
-    var finishReason = "stop";
     try
     {
         await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(chatHistory, executionSettings, kernel: null, context.RequestAborted))
@@ -200,7 +156,6 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
         || ex.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase))
     {
         // Azure OpenAI content filter rejection
-        finishReason = "content_filter";
         var fallback = "Beklager, jeg kan ikke svare på det. Kan jeg hjelpe deg med noe annet?";
         fullResponse.Clear();
         fullResponse.Append(fallback);
@@ -208,17 +163,7 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
         await context.Response.Body.FlushAsync();
     }
 
-    // 9. Complete Langfuse generation with output
-    generation.SetResponse(new GenAiResponse
-    {
-        Model = deploymentName,
-        Completion = fullResponse.ToString(),
-        FinishReasons = [finishReason]
-    });
-
-    langfuseTrace.SetOutput(new { response = fullResponse.ToString() });
-
-    // 10. Send [DONE] marker
+    // 7. Send [DONE] marker
     await context.Response.WriteAsync("data: [DONE]\n\n");
     await context.Response.Body.FlushAsync();
 

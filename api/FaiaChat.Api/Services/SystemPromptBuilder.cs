@@ -1,46 +1,13 @@
-using zborek.Langfuse.Client;
-using zborek.Langfuse.Models.Prompt;
-
 namespace FaiaChat.Api.Services;
 
 public class SystemPromptBuilder
 {
-    private readonly ILangfuseClient _langfuse;
-    private static string? _cachedPrompt;
-    private static DateTime _cacheExpiry;
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
-
-    public SystemPromptBuilder(ILangfuseClient langfuse)
+    public Task<string> BuildAsync()
     {
-        _langfuse = langfuse;
+        return Task.FromResult(BuildPrompt());
     }
 
-    public async Task<string> BuildAsync()
-    {
-        if (_cachedPrompt is not null && DateTime.UtcNow < _cacheExpiry)
-            return _cachedPrompt;
-
-        try
-        {
-            var prompt = await _langfuse.GetPromptAsync("faia-system-prompt", label: "production");
-            if (prompt is TextPrompt textPrompt)
-            {
-                var template = textPrompt.PromptText;
-                var compiled = template.Replace("{{knowledge}}", Content);
-                _cachedPrompt = compiled;
-                _cacheExpiry = DateTime.UtcNow.Add(CacheTtl);
-                return compiled;
-            }
-        }
-        catch
-        {
-            // Fallback to hardcoded prompt if Langfuse is unavailable
-        }
-
-        return BuildFallback();
-    }
-
-    private string BuildFallback()
+    private string BuildPrompt()
     {
         return $"""
             Du er FAIA, en erfaren rådgiver hos Forte som hjelper potensielle kunder å forstå AI Accelerator.
