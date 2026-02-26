@@ -46,9 +46,12 @@ builder.Services.AddOpenTelemetry()
             });
         }
     });
-builder.Services.AddLangfuseTracing();
-builder.Services.AddLangfuse(builder.Configuration);
-LangfuseOtlpExtensions.UseLangfuseActivityListener();
+if (langfuseEnabled)
+{
+    builder.Services.AddLangfuseTracing();
+    builder.Services.AddLangfuse(builder.Configuration);
+    LangfuseOtlpExtensions.UseLangfuseActivityListener();
+}
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
     ?? new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:5175" };
