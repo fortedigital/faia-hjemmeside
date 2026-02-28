@@ -1,4 +1,5 @@
 using FaiaChat.Api.Models;
+using FaiaChat.Api.Plugins;
 using FaiaChat.Api.Services;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.SemanticKernel;
@@ -19,7 +20,9 @@ var apiKey = azureOpenAI["ApiKey"]
 var deploymentName = azureOpenAI["DeploymentName"]
     ?? throw new InvalidOperationException("AzureOpenAI:DeploymentName is not configured");
 
-builder.Services.AddAzureOpenAIChatCompletion(deploymentName, endpoint, apiKey);
+var kernelBuilder = builder.Services.AddKernel();
+kernelBuilder.AddAzureOpenAIChatCompletion(deploymentName, endpoint, apiKey);
+kernelBuilder.Plugins.AddFromType<FaiaAcceleratorPlugin>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
     ?? new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:5175" };
@@ -80,7 +83,7 @@ app.UseRateLimiter();
 
 app.MapGet("/health", () => "OK");
 
-app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chatService, SystemPromptBuilder promptBuilder, HttpContext context) =>
+app.MapPost("/api/chat", async (ChatRequest request, Kernel kernel, SystemPromptBuilder promptBuilder, HttpContext context) =>
 {
     // 1. Validate
     if (request.Messages is null || request.Messages.Count == 0)
@@ -119,6 +122,7 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
     // 4. Execution settings
     var executionSettings = new PromptExecutionSettings
     {
+        FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
         ExtensionData = new Dictionary<string, object>
         {
             ["temperature"] = 0.7,
@@ -136,7 +140,8 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatCompletionService chat
     var fullResponse = new System.Text.StringBuilder();
     try
     {
-        await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(chatHistory, executionSettings, kernel: null, context.RequestAborted))
+        var chatService = kernel.GetRequiredService<IChatCompletionService>();
+        await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(chatHistory, executionSettings, kernel, context.RequestAborted))
         {
             if (chunk.Content is { } text && text.Length > 0)
             {
